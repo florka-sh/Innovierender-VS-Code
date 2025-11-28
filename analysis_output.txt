@@ -1,0 +1,101 @@
+======================================================================
+EXCEL FILE STRUCTURE
+======================================================================
+
+Shape: 10 rows, 23 columns
+
+Column names:
+  1. SATZART
+  2. FIRMA
+  3. BELEG_NR
+  4. BELEG_DAT
+  5. SOLL_HABEN
+  6. BUCH_KREIS
+  7. BUCH_JAHR
+  8. BUCH_MONAT
+  9. DEBI_KREDI
+  10. BETRAG
+  11. RECHNUNG
+  12. leer
+  13. BUCH_TEXT
+  14. HABENKONTO
+  15. SOLLKONTO
+  16. leer_1
+  17. KOSTSTELLE
+  18. KOSTTRAGER
+  19. Kostenträgerbezeichnung
+  20. Bebuchbar
+  21. Debitoren.Bezeichnung
+  22. Debitoren.Aktuelle Anschrift Anschrift-Zusatz
+  23. AbgBenutzerdefiniert
+
+Sample data (first 5 rows):
+  SATZART  FIRMA    BELEG_NR  BELEG_DAT SOLL_HABEN BUCH_KREIS  BUCH_JAHR  BUCH_MONAT   DEBI_KREDI    BETRAG    RECHNUNG  leer                    BUCH_TEXT  HABENKONTO  SOLLKONTO  leer_1  KOSTSTELLE    KOSTTRAGER Kostenträgerbezeichnung Bebuchbar  Debitoren.Bezeichnung  Debitoren.Aktuelle Anschrift Anschrift-Zusatz  AbgBenutzerdefiniert
+0       D   9251  1155500289   20251031          H         RA       2025          10  53122165120   82625.0  1155500289   NaN  1025 SPFH Familie Angermann       42200        NaN     NaN         190  190111512110         SPFH/HzE Siegen        Ja                    NaN                                            NaN                   NaN
+1       D   9251  1155500290   20251031          H         RA       2025          10  53122165120  167266.0  1155500290   NaN   1025 SPFH Familie Fröhlich       42200        NaN     NaN         190  190111512110         SPFH/HzE Siegen        Ja                    NaN                                            NaN                   NaN
+2       D   9251  1155500291   20251031          H         RA       2025          10  53122165120   36275.0  1155500291   NaN   1025 SPFH Familie Gambino        42200        NaN     NaN         190  190111512110         SPFH/HzE Siegen        Ja                    NaN                                            NaN                   NaN
+3       D   9251  1155500292   20251031          H         RA       2025          10  53122165120   18137.0  1155500292   NaN      1025 SPFH Familie Kenjo       42200        NaN     NaN         190  190111512110         SPFH/HzE Siegen        Ja                    NaN                                            NaN                   NaN
+4       D   9251  1155500293   20251031          H         RA       2025          10  53122165120  185403.0  1155500293   NaN   1025 SPFH Familie Kovanova       42200        NaN     NaN         190  190111512110         SPFH/HzE Siegen        Ja                    NaN                                            NaN                   NaN
+
+
+======================================================================
+PDF FILE STRUCTURE
+======================================================================
+
+Total pages: 10
+
+First page text (first 2000 chars):
+IB West gGmbH, Schanzenstraße 41D, 51063 Köln
+Ihr Ansprechpartner: Sabrina Joseph
+Stadt Solingen Kommunales Jobcenter
+Tel.: 0212-460 06
+Kamper Str. 35
+Fax: 0212-645 698 38
+42699 Solingen
+Email: Sabrina.joseph@ib.de
+Seite 1/1
+Bei Zahlung bitte immer angeben:
+Rechnungsnummer: 1155500316
+Rechnungsdatum: 27.11.2025
+Kunden-Nummer: 51 111 291 120
+Ausstellungsdatum 27.11.2025
+Rechnung Steuer-Nummer: 014 255 64066
+Lfd. Nr. Lieferung/Leistung/Stundenanzahl Betrag
+1 Durchführung einer Lernförderung für:
+Cana Khudidah
+Grundschule Klauberg
+10/25 Deutsch 1 Zeitstunden á 25,00 € 25,00 €
+10/25 Mathe 1 Zeitstunden á 25,00 € 25,00 €
+42100/0111 121512520
+Nettobetrag 50,00 €
+Mehrwertsteuer 0% 0,00 €
+Mehrwertsteuer 0%, da Steuerbefreiung gemäß § 4 Nr. 18 UStG
+Rechnungsbetrag 50,00 €
+abzüglich geleisteter Abschlagszahlungen 0,00 €
+Zahlbetrag 50,00 €
+Bitte überweisen Sie den ausgewiesenen Betrag unter Angabe unserer Rechnungsnummer
+IBAN: DE24 3702 0500 0001 3851 51 BIC: BFSWDE33XXX
+Internationaler Bund (IB) · IB West gGmbH für Bildung und soziale Dienste (IB West gGmbH) Bankverbindung:
+Geschäftsführung: Mirjam Michalski IB West gGmbH
+Handelsregister Amtsgericht Frankfurt am Main HRB 97105 · St.Nr. Organträger 014 255 56703 · Ust.-IdNr DE 290 088 569 Bank für Sozialwirtschaft Köln
+Gesellschafter: IB e.V., vertreten durch den Vorstand Thiemo Fojkar (Vorsitzender), Karola Becker, Janine Krohe DE24 3702 0500 0001 3851 51
+Die Gesellschaft ist als gemeinnützig anerkannt. BFSWDE33XXX
+
+
+Tables found on first page: 2
+
+--- Table 1 ---
+Rows: 4, Columns: 2
+Row 0: ['Rechnungsnummer:', '1155500316']
+Row 1: ['Rechnungsdatum:', '27.11.2025']
+Row 2: ['Kunden-Nummer:', '51 111 291 120']
+Row 3: ['Ausstellungsdatum', '27.11.2025']
+
+--- Table 2 ---
+Rows: 6, Columns: 3
+Row 0: ['Lfd. Nr.', 'Lieferung/Leistung/Stundenanzahl', 'Betrag']
+Row 1: ['1', 'Durchführung einer Lernförderung für:\nCana Khudidah\nGrundschule Klauberg\n10/25 Deutsch 1 Zeitstunden á 25,00 €\n10/25 Mathe 1 Zeitstunden á 25,00 €\n42100/0111 121512520', '25,00 €\n25,00 €']
+Row 2: ['Nettobetrag\nMehrwertsteuer 0%\nMehrwertsteuer 0%, da Steuerbefreiung gemäß § 4 Nr. 18 UStG', None, '50,00 €\n0,00 €']
+Row 3: ['Rechnungsbetrag', None, '50,00 €']
+Row 4: ['abzüglich geleisteter Abschlagszahlungen', None, '0,00 €']
+Row 5: ['Zahlbetrag', None, '50,00 €']

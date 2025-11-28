@@ -1,0 +1,91 @@
+Starting analysis...
+
+--- Analyzing Excel: 9241_1025_Bereitschatspflege_KRED.xlsx ---
+✅ Columns found:
+  - SATZART
+  - FIRMA
+  - BELEG_NR
+  - BELEG_DAT
+  - SOLL_HABEN
+  - BUCH_KREIS
+  - BUCH_JAHR
+  - BUCH_MONAT
+  - DEBI_KREDI
+  - BETRAG
+  - RECHNUNG
+  - leer
+  - BUCH_TEXT
+  - HABENKONTO
+  - SOLLKONTO
+  - leer_1
+  - KOSTSTELLE
+  - KOSTTRAGER
+Rows: 29
+
+--- Analyzing Excel: 9241_1125_Bereitschaftspflege_Fibuübernamepaket_KRED.xlsx ---
+✅ Columns found:
+  - SATZART
+  - FIRMA
+  - BELEG_NR
+  - BELEG_DAT
+  - SOLL_HABEN
+  - BUCH_KREIS
+  - BUCH_JAHR
+  - BUCH_MONAT
+  - DEBI_KREDI
+  - BETRAG
+  - RECHNUNG
+  - leer
+  - BUCH_TEXT
+  - HABENKONTO
+  - SOLLKONTO
+  - leer_1
+  - KOSTSTELLE
+  - KOSTTRAGER
+Rows: 27
+
+--- Analyzing Excel: Auszahlungsbelege Pflegefamilien 11.2025.xlsx ---
+✅ Columns found:
+  - Bereitschaftspflege 
+  - Unnamed: 1
+  - Unnamed: 2
+  - Unnamed: 3
+  - Unnamed: 4
+  - Unnamed: 5
+  - Unnamed: 6
+  - Unnamed: 7
+Rows: 21
+
+--- Analyzing Excel: output_final.xlsx ---
+✅ Columns found:
+  - SATZART
+  - FIRMA
+  - BELEG_NR
+  - BELEG_DAT
+  - SOLL_HABEN
+  - BUCH_KREIS
+  - BUCH_JAHR
+  - BUCH_MONAT
+  - DEBI_KREDI
+  - BETRAG
+  - RECHNUNG
+  - leer
+  - BUCH_TEXT
+  - HABENKONTO
+  - SOLLKONTO
+  - leer_1
+  - KOSTSTELLE
+  - KOSTTRAGER
+Rows: 42
+
+--- Analyzing PDF: RE_JHV_Oktober 2025_ambulant_1460-1511.pdf ---
+⚠️ No text detected. OCR likely needed.
+
+--- Analyzing PDF: RE_JHV_Oktober 2025_stationär_1382-1459.pdf ---
+⚠️ No text detected. OCR likely needed.
+
+--- Analyzing PDF: RE_JHV_Oktober 2025_teilstationär_1373-1381.pdf ---
+⚠️ No text detected. OCR likely needed.
+
+--- Analyzing PDF: temp_RE_JHV_Oktober 2025_teilstationär_1373-1381.pdf ---
+⚠️ No text detected. OCR likely needed.

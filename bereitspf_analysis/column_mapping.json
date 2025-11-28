@@ -1,0 +1,21 @@
+{
+  "comment": "Column mapping configuration for heuristic extractor. Maps source column names to template column names.",
+  "mappings": {
+    "Betrag": "BETRAG",
+    "betrag": "BETRAG",
+    "Konto": "HABENKONTO",
+    "konto": "HABENKONTO",
+    "Kreditor": "DEBI_KREDI",
+    "kreditor": "DEBI_KREDI",
+    "Text": "BUCH_TEXT",
+    "text": "BUCH_TEXT",
+    "Beschreibung": "BUCH_TEXT",
+    "beschreibung": "BUCH_TEXT",
+    "KST": "KOSTSTELLE",
+    "Koststelle": "KOSTSTELLE",
+    "koststelle": "KOSTSTELLE",
+    "KTR": "KOSTTRAGER",
+    "Kostträger": "KOSTTRAGER",
+    "kostträger": "KOSTTRAGER"
+  }
+}

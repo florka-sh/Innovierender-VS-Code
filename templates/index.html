@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Invoice Extractor - Lernförderung</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📄 PDF Invoice Extractor</h1>
+            <p class="subtitle">Automatische Rechnungsextraktion für Lernförderung</p>
+        </header>
+
+        <!-- Step 1: Upload PDF -->
+        <section id="upload-section" class="card">
+            <h2>Schritt 1: PDF hochladen</h2>
+            <div class="upload-area" id="dropZone">
+                <div class="upload-icon">📤</div>
+                <p class="upload-text">PDF hier ablegen oder klicken zum Auswählen</p>
+                <input type="file" id="pdfInput" accept=".pdf" hidden>
+                <p class="upload-hint">Maximale Dateigröße: 50MB</p>
+            </div>
+            <div id="uploadStatus" class="status-message"></div>
+        </section>
+
+        <!-- Step 2: Preview Data -->
+        <section id="preview-section" class="card hidden">
+            <h2>Schritt 2: Extrahierte Daten</h2>
+            <div id="previewStats" class="stats-container"></div>
+            <div id="previewTable" class="table-container"></div>
+        </section>
+
+        <!-- Step 3: Configure Columns -->
+        <section id="config-section" class="card hidden">
+            <h2>Schritt 3: Buchhaltungsparameter konfigurieren</h2>
+            <form id="configForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="firma">FIRMA</label>
+                        <input type="text" id="firma" name="firma" value="9251" placeholder="z.B. 9251">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="satzart">SATZART</label>
+                        <input type="text" id="satzart" name="satzart" value="D" placeholder="z.B. D">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="soll_haben">SOLL/HABEN</label>
+                        <select id="soll_haben" name="soll_haben">
+                            <option value="H" selected>H (Haben)</option>
+                            <option value="S">S (Soll)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buch_kreis">BUCH_KREIS</label>
+                        <input type="text" id="buch_kreis" name="buch_kreis" value="RA" placeholder="z.B. RA">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="habenkonto">HABENKONTO</label>
+                        <input type="text" id="habenkonto" name="habenkonto" value="42200" placeholder="z.B. 42200">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="koststelle">KOSTSTELLE</label>
+                        <input type="text" id="koststelle" name="koststelle" value="190" placeholder="z.B. 190">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="kosttrager">KOSTTRÄGER</label>
+                        <input type="text" id="kosttrager" name="kosttrager" value="190111512110" placeholder="z.B. 190111512110">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="kosttraegerbezeichnung">Kostenträgerbezeichnung</label>
+                        <input type="text" id="kosttraegerbezeichnung" name="kosttraegerbezeichnung" value="SPFH/HzE Siegen" placeholder="z.B. SPFH/HzE Siegen">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bebuchbar">Bebuchbar</label>
+                        <select id="bebuchbar" name="bebuchbar">
+                            <option value="Ja" selected>Ja</option>
+                            <option value="Nein">Nein</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="buch_text_prefix">BUCH_TEXT Prefix</label>
+                        <input type="text" id="buch_text_prefix" name="buch_text_prefix" value="1025" placeholder="z.B. 1025">
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="generateBtn">
+                    <span class="btn-text">Excel generieren</span>
+                    <span class="btn-loader hidden">⏳ Wird generiert...</span>
+                </button>
+            </form>
+            <div id="generateStatus" class="status-message"></div>
+        </section>
+
+        <!-- Step 4: Download -->
+        <section id="download-section" class="card hidden">
+            <h2>✅ Fertig!</h2>
+            <p>Ihre Excel-Datei wurde erfolgreich erstellt.</p>
+            <a id="downloadLink" class="btn btn-success" download>
+                📥 Excel-Datei herunterladen
+            </a>
+        </section>
+    </div>
+
+    <script>
+        let extractedData = null;
+
+        // Drag and drop functionality
+        const dropZone = document.getElementById('dropZone');
+        const pdfInput = document.getElementById('pdfInput');
+
+        dropZone.addEventListener('click', () => pdfInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                pdfInput.files = files;
+                handleFileUpload(files[0]);
+            }
+        });
+
+        pdfInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        async function handleFileUpload(file) {
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                showStatus('uploadStatus', 'Bitte wählen Sie eine PDF-Datei aus.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('pdf_file', file);
+
+            showStatus('uploadStatus', '⏳ PDF wird verarbeitet...', 'info');
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    extractedData = data.invoices;
+                    showStatus('uploadStatus', `✅ ${data.invoice_count} Einträge erfolgreich extrahiert!`, 'success');
+                    displayPreview(data.invoices, data.invoice_count);
+                    document.getElementById('preview-section').classList.remove('hidden');
+                    document.getElementById('config-section').classList.remove('hidden');
+                } else {
+                    showStatus('uploadStatus', `❌ Fehler: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('uploadStatus', `❌ Fehler beim Hochladen: ${error.message}`, 'error');
+            }
+        }
+
+        function displayPreview(invoices, count) {
+            // Display stats
+            const statsHtml = `
+                <div class="stat-box">
+                    <div class="stat-number">${count}</div>
+                    <div class="stat-label">Posten gefunden</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">${new Set(invoices.map(i => i.invoice_number)).size}</div>
+                    <div class="stat-label">Rechnungen</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">${new Set(invoices.map(i => i.student_name)).size}</div>
+                    <div class="stat-label">Schüler</div>
+                </div>
+            `;
+            document.getElementById('previewStats').innerHTML = statsHtml;
+
+            // Display table
+            let tableHtml = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Rechnung</th>
+                            <th>Datum</th>
+                            <th>Schüler</th>
+                            <th>Schule</th>
+                            <th>Fach</th>
+                            <th>Stunden</th>
+                            <th>Betrag</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            invoices.forEach(inv => {
+                tableHtml += `
+                    <tr>
+                        <td>${inv.invoice_number || ''}</td>
+                        <td>${inv.invoice_date || ''}</td>
+                        <td>${inv.student_name || ''}</td>
+                        <td>${inv.school || ''}</td>
+                        <td>${inv.subject || ''}</td>
+                        <td>${inv.hours || 0}</td>
+                        <td>${inv.amount ? inv.amount.toFixed(2) + ' €' : ''}</td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += '</tbody></table>';
+            document.getElementById('previewTable').innerHTML = tableHtml;
+        }
+
+        // Handle form submission
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const generateBtn = document.getElementById('generateBtn');
+            
+            generateBtn.querySelector('.btn-text').classList.add('hidden');
+            generateBtn.querySelector('.btn-loader').classList.remove('hidden');
+            generateBtn.disabled = true;
+
+            try {
+                const response = await fetch('/generate_excel', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus('generateStatus', '✅ Excel-Datei erfolgreich generiert!', 'success');
+                    document.getElementById('downloadLink').href = data.download_url;
+                    document.getElementById('download-section').classList.remove('hidden');
+                    document.getElementById('download-section').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    showStatus('generateStatus', `❌ Fehler: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('generateStatus', `❌ Fehler: ${error.message}`, 'error');
+            } finally {
+                generateBtn.querySelector('.btn-text').classList.remove('hidden');
+                generateBtn.querySelector('.btn-loader').classList.add('hidden');
+                generateBtn.disabled = false;
+            }
+        });
+
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status-message status-${type}`;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+"""
+Quick Test - Run this to verify button visibility
+This will print what you should see at each stage
+"""
+
+print("=" * 60)
+print("BUTTON VISIBILITY GUIDE")
+print("=" * 60)
+
+print("\n📍 STAGE 1: App Opens")
+print("-" * 60)
+print("What you see:")
+print("  ✓ Header: 'PDF Invoice Extractor'")
+print("  ✓ Section: 'Schritt 1: PDF-Datei auswählen'")
+print("  ✓ Button: '📁 Durchsuchen' (Browse)")
+print("  ✓ Button: '🚀 Daten extrahieren' (DISABLED/grayed out)")
+print("\nConfiguration section is HIDDEN")
+print("Buttons are NOT visible yet")
+
+print("\n📍 STAGE 2: After Selecting PDF")
+print("-" * 60)
+print("What you see:")
+print("  ✓ File name displayed")
+print("  ✓ Button: '🚀 Daten extrahieren' (NOW ENABLED)")
+print("\nConfiguration section still HIDDEN")
+print("Excel buttons still NOT visible")
+
+print("\n📍 STAGE 3: After Clicking 'Daten extrahieren'")
+print("-" * 60)
+print("What you see:")
+print("  ✓ Status: '✅ X Einträge erfolgreich extrahiert!'")
+print("  ✓ Preview window pops up (showing extracted data)")
+print("  ✓ Section: 'Schritt 2: Buchhaltungsparameter' (NOW VISIBLE)")
+print("  ✓ Configuration form with 10 fields")
+print("  ✓ Button: '💾 Save As New Excel' (NOW VISIBLE & ENABLED)")
+print("\n  ❌ Button: '🔄 Regenerate Same File' (STILL HIDDEN)")
+
+print("\n📍 STAGE 4: After First Save")
+print("-" * 60)
+print("What you see:")
+print("  ✓ Button: '💾 Save As New Excel' (still visible)")
+print("  ✓ Button: '🔄 Regenerate Same File' (NOW VISIBLE)")
+print("  ✓ Status: '💾 Saved: filename.xlsx'")
+print("\nBoth buttons are now side-by-side!")
+
+print("\n" + "=" * 60)
+print("CURRENT SETUP:")
+print("=" * 60)
+print("The app is currently running.")
+print("\nTO SEE THE BUTTONS:")
+print("1. In the app window, click '📁 Durchsuchen'")
+print("2. Select: RE_1155500316-325.pdf")
+print("3. Click: '🚀 Daten extrahieren'")
+print("4. Wait a few seconds...")
+print("5. The buttons will appear in 'Schritt 2' section!")
+print("=" * 60)
