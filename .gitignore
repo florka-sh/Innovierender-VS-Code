@@ -45,6 +45,7 @@ instance/
 uploads/
 outputs/
 *.xlsx
+!kostentreäger_info_3.xlsx
 *.pdf
 
 # Temporary files

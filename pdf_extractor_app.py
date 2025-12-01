@@ -339,12 +339,22 @@ class MultiProjectApp:
                                     )
                         except Exception:
                             pass
+                    # Use normal state (editable) if no options found
+                    combo_state = 'readonly' if options else 'normal'
                     self.firma_combo = ttk.Combobox(
                         f_frame, textvariable=self.firma_var,
-                        values=options, state='readonly'
+                        values=options, state=combo_state
                     )
                     self.firma_combo.pack(fill=tk.X, ipady=0)
                     entry_widget = self.firma_combo
+                    # Show warning if no options
+                    if not options:
+                        warn_lbl = tk.Label(
+                            f_frame, text="⚠ kostentreäger_info_3.xlsx fehlt",
+                            bg=ModernStyle.BG_CARD, fg='#ff9800',
+                            font=('Segoe UI', 8)
+                        )
+                        warn_lbl.pack(anchor=tk.W, pady=(2,0))
                 except Exception:
                     entry = tk.Entry(
                         f_frame, bg=ModernStyle.BG_INPUT,
@@ -647,9 +657,10 @@ class MultiProjectApp:
                                     )
                         except Exception:
                             pass
+                    combo_state = 'readonly' if options else 'normal'
                     combo = ttk.Combobox(
                         f_frame, textvariable=firma_var,
-                        values=options, state='readonly',
+                        values=options, state=combo_state,
                         font=('Segoe UI', 9)
                     )
                     combo.pack(fill=tk.X, ipady=0)
