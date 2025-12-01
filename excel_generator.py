@@ -6,9 +6,131 @@ Generates Excel files from extracted invoice data in the required accounting for
 import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Define column names as constant to avoid duplication
+EXCEL_COLUMNS = [
+    'SATZART', 'FIRMA', 'BELEG_NR', 'BELEG_DAT', 'SOLL_HABEN',
+    'BUCH_KREIS', 'BUCH_JAHR', 'BUCH_MONAT', 'DEBI_KREDI',
+    'BETRAG', 'RECHNUNG', 'leer', 'BUCH_TEXT', 'HABENKONTO',
+    'SOLLKONTO', 'leer_1', 'KOSTSTELLE', 'KOSTTRAGER',
+    'Kostenträgerbezeichnung', 'Bebuchbar',
+    'Debitoren.Bezeichnung',
+    'Debitoren.Aktuelle Anschrift Anschrift-Zusatz',
+    'AbgBenutzerdefiniert'
+]
 
 
-def generate_excel(invoice_data: List[Dict[str, Any]], output_path: str, config: Dict[str, Any]) -> None:
+def _parse_invoice_date(
+    invoice_date: str
+) -> tuple:
+    """
+    Parse and convert invoice date.
+    
+    Returns:
+        Tuple of (beleg_dat, buch_jahr, buch_monat)
+    """
+    if not invoice_date:
+        return '', '', ''
+    
+    try:
+        date_obj = datetime.strptime(invoice_date, '%d.%m.%Y')
+        return (
+            date_obj.strftime('%Y%m%d'),
+            date_obj.year,
+            date_obj.month
+        )
+    except ValueError:
+        logger.warning(
+            f'Invalid date format: {invoice_date}'
+        )
+        return '', '', ''
+
+
+def _build_booking_text(
+    config: Dict[str, Any],
+    item: Dict[str, Any]
+) -> str:
+    """Build booking text from configuration and item data."""
+    parts = []
+    
+    if config.get('BUCH_TEXT_PREFIX'):
+        parts.append(config['BUCH_TEXT_PREFIX'])
+    if item.get('student_name'):
+        parts.append(item['student_name'])
+    if item.get('subject'):
+        parts.append(item['subject'])
+    if item.get('school'):
+        parts.append(f"({item['school']})")
+    
+    return ' '.join(parts) if parts else ''
+
+
+def _create_row(
+    item: Dict[str, Any],
+    config: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Create a single row for the Excel file.
+    
+    Args:
+        item: Invoice line item
+        config: Configuration dictionary
+        
+    Returns:
+        Dictionary representing one Excel row
+    """
+    beleg_dat, buch_jahr, buch_monat = _parse_invoice_date(
+        item.get('invoice_date', '')
+    )
+    
+    # Convert amount to cents
+    betrag = (
+        int(item.get('amount', 0) * 100)
+        if item.get('amount')
+        else 0
+    )
+    
+    buch_text = _build_booking_text(config, item)
+    
+    row = {
+        'SATZART': config.get('SATZART', 'D'),
+        'FIRMA': config.get('FIRMA', ''),
+        'BELEG_NR': item.get('invoice_number', ''),
+        'BELEG_DAT': beleg_dat,
+        'SOLL_HABEN': config.get('SOLL_HABEN', ''),
+        'BUCH_KREIS': config.get('BUCH_KREIS', ''),
+        'BUCH_JAHR': buch_jahr,
+        'BUCH_MONAT': buch_monat,
+        'DEBI_KREDI': item.get('customer_number', ''),
+        'BETRAG': betrag,
+        'RECHNUNG': item.get('invoice_number', ''),
+        'leer': None,
+        'BUCH_TEXT': buch_text,
+        'HABENKONTO': config.get('HABENKONTO', ''),
+        'SOLLKONTO': None,
+        'leer_1': None,
+        'KOSTSTELLE': config.get('KOSTSTELLE', ''),
+        'KOSTTRAGER': config.get('KOSTTRAGER', ''),
+        'Kostenträgerbezeichnung': config.get(
+            'Kostenträgerbezeichnung', ''
+        ),
+        'Bebuchbar': config.get('Bebuchbar', 'Ja'),
+        'Debitoren.Bezeichnung': None,
+        'Debitoren.Aktuelle Anschrift Anschrift-Zusatz': None,
+        'AbgBenutzerdefiniert': None
+    }
+    
+    return row
+
+
+def generate_excel(
+    invoice_data: List[Dict[str, Any]],
+    output_path: str,
+    config: Dict[str, Any]
+) -> pd.DataFrame:
     """
     Generate Excel file from invoice data.
     
@@ -16,80 +138,24 @@ def generate_excel(invoice_data: List[Dict[str, Any]], output_path: str, config:
         invoice_data: List of extracted invoice line items
         output_path: Path where Excel file should be saved
         config: Configuration dictionary with default column values
+        
+    Returns:
+        Generated DataFrame
     """
-    # Create list of rows for DataFrame
-    rows = []
-    
-    for item in invoice_data:
-        # Convert date to YYYYMMDD format
-        invoice_date = item.get('invoice_date', '')
-        if invoice_date:
-            try:
-                date_obj = datetime.strptime(invoice_date, '%d.%m.%Y')
-                beleg_dat = date_obj.strftime('%Y%m%d')
-                buch_jahr = date_obj.year
-                buch_monat = date_obj.month
-            except ValueError:
-                beleg_dat = ''
-                buch_jahr = ''
-                buch_monat = ''
-        else:
-            beleg_dat = ''
-            buch_jahr = ''
-            buch_monat = ''
+    try:
+        rows = [_create_row(item, config) for item in invoice_data]
         
-        # Convert amount to cents (multiply by 100)
-        betrag = int(item.get('amount', 0) * 100) if item.get('amount') else 0
+        # Create DataFrame
+        df = pd.DataFrame(rows, columns=EXCEL_COLUMNS)
         
-        # Build descriptive text from student, subject, and course info
-        buch_text_parts = []
-        if config.get('BUCH_TEXT_PREFIX'):
-            buch_text_parts.append(config.get('BUCH_TEXT_PREFIX'))
-        if item.get('student_name'):
-            buch_text_parts.append(item.get('student_name'))
-        if item.get('subject'):
-            buch_text_parts.append(item.get('subject'))
-        if item.get('school'):
-            buch_text_parts.append(f"({item.get('school')})")
+        # Save to Excel
+        df.to_excel(output_path, index=False, engine='openpyxl')
+        logger.info(f'Excel file generated: {output_path}')
         
-        buch_text = ' '.join(buch_text_parts) if buch_text_parts else ''
-        
-        # Create row with all 23 columns
-        row = {
-            'SATZART': config.get('SATZART', 'D'),
-            'FIRMA': config.get('FIRMA', ''),
-            'BELEG_NR': item.get('invoice_number', ''),
-            'BELEG_DAT': beleg_dat,
-            'SOLL_HABEN': config.get('SOLL_HABEN', ''),
-            'BUCH_KREIS': config.get('BUCH_KREIS', ''),
-            'BUCH_JAHR': buch_jahr,
-            'BUCH_MONAT': buch_monat,
-            'DEBI_KREDI': item.get('customer_number', ''),
-            'BETRAG': betrag,
-            'RECHNUNG': item.get('invoice_number', ''),
-            'leer': None,
-            'BUCH_TEXT': buch_text,
-            'HABENKONTO': config.get('HABENKONTO', ''),
-            'SOLLKONTO': None,
-            'leer_1': None,
-            'KOSTSTELLE': config.get('KOSTSTELLE', ''),
-            'KOSTTRAGER': config.get('KOSTTRAGER', ''),
-            'Kostenträgerbezeichnung': config.get('Kostenträgerbezeichnung', ''),
-            'Bebuchbar': config.get('Bebuchbar', 'Ja'),
-            'Debitoren.Bezeichnung': None,
-            'Debitoren.Aktuelle Anschrift Anschrift-Zusatz': None,
-            'AbgBenutzerdefiniert': None
-        }
-        
-        rows.append(row)
-    
-    # Create DataFrame
-    df = pd.DataFrame(rows)
-    
-    # Save to Excel
-    df.to_excel(output_path, index=False, engine='openpyxl')
-    
-    return df
+        return df
+    except Exception as e:
+        logger.error(f'Error generating Excel: {str(e)}')
+        raise
 
 
 if __name__ == "__main__":

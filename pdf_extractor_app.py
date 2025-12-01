@@ -101,6 +101,8 @@ class MultiProjectApp:
         self.raw_pdf_data = []
         self.pdf_path = None
         self.mapping_data = None
+        # Extended mapping (with FIRMA & DEBI_KREDI details, e.g. kostentreäger_info_3.xlsx)
+        self.extended_mapping = None
         self.data_dir = Path("data")
         self.data_dir.mkdir(exist_ok=True)
         self.mapping_file_path = self.data_dir / "mapping_db.xlsx"
@@ -118,6 +120,7 @@ class MultiProjectApp:
         
         # Auto-load PDF Reader mapping
         self.load_stored_mapping()
+        self.load_extended_mapping()
         
     def setup_styles(self):
         """Configure ttk styles"""
@@ -299,18 +302,83 @@ class MultiProjectApp:
         for field, default in fields:
             f_frame = tk.Frame(scroll_frame, bg=ModernStyle.BG_CARD, pady=5)
             f_frame.pack(fill=tk.X)
-            tk.Label(f_frame, text=field, bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY).pack(anchor=tk.W)
-            entry = tk.Entry(f_frame, bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT)
-            entry.insert(0, default)
-            entry.pack(fill=tk.X, ipady=5)
-            self.pdf_config_entries[field] = entry
+            tk.Label(
+                f_frame, text=field, bg=ModernStyle.BG_CARD,
+                fg=ModernStyle.TEXT_SECONDARY
+            ).pack(anchor=tk.W)
+            # Use Combobox for FIRMA to pick from mapping DB
+            if field == 'FIRMA':
+                self.firma_var = tk.StringVar(value=default)
+                try:
+                    options = []
+                    # Primary source: mapping DB if it has FIRMA
+                    if (
+                        self.mapping_data is not None and
+                        'FIRMA' in self.mapping_data.columns
+                    ):
+                        options = sorted(
+                            set(
+                                self.mapping_data['FIRMA']
+                                .astype(str).str.strip()
+                            )
+                        )
+                    else:
+                        # Fallback: use kostentreäger_info_3.xlsx if present
+                        try:
+                            from pathlib import Path
+                            alt_path = Path('kostentreäger_info_3.xlsx')
+                            if alt_path.exists():
+                                import pandas as pd
+                                alt_df = pd.read_excel(alt_path)
+                                if 'FIRMA' in alt_df.columns:
+                                    options = sorted(
+                                        set(
+                                            alt_df['FIRMA']
+                                            .astype(str).str.strip()
+                                        )
+                                    )
+                        except Exception:
+                            pass
+                    self.firma_combo = ttk.Combobox(
+                        f_frame, textvariable=self.firma_var,
+                        values=options, state='readonly'
+                    )
+                    self.firma_combo.pack(fill=tk.X, ipady=0)
+                    entry_widget = self.firma_combo
+                except Exception:
+                    entry = tk.Entry(
+                        f_frame, bg=ModernStyle.BG_INPUT,
+                        fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT
+                    )
+                    entry.insert(0, default)
+                    entry.pack(fill=tk.X, ipady=5)
+                    entry_widget = entry
+            else:
+                entry = tk.Entry(
+                    f_frame, bg=ModernStyle.BG_INPUT,
+                    fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT
+                )
+                entry.insert(0, default)
+                entry.pack(fill=tk.X, ipady=5)
+                entry_widget = entry
+            self.pdf_config_entries[field] = entry_widget
         
         tk.Label(scroll_frame, text="BUCH_TEXT Template", bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY).pack(anchor=tk.W, pady=(15, 0))
         self.pdf_buch_text_entry = tk.Entry(scroll_frame, bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT)
         self.pdf_buch_text_entry.insert(0, "1025 {student} {subject}")
         self.pdf_buch_text_entry.pack(fill=tk.X, ipady=5)
         
-        ttk.Button(card3, text="⚡ Auf alle anwenden", style='Primary.TButton', command=self.apply_pdf_settings).pack(fill=tk.X, pady=(10, 0))
+        # Buttons: apply and check matches
+        btns = tk.Frame(card3, bg=ModernStyle.BG_CARD)
+        btns.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(
+            btns, text="⚡ Auf alle anwenden", style='Primary.TButton',
+            command=self.apply_pdf_settings
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,5))
+        ttk.Button(
+            btns, text="🔎 Prüfe Matches", style='Secondary.TButton',
+            command=self.preview_pdf_matches
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5,0))
         
         # Export card
         card4 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
@@ -385,10 +453,64 @@ class MultiProjectApp:
             f_frame = tk.Frame(scroll_frame, bg=ModernStyle.BG_CARD, pady=3)
             f_frame.pack(fill=tk.X, padx=5)
             tk.Label(f_frame, text=field, bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY, font=('Segoe UI', 9)).pack(anchor=tk.W)
-            entry = tk.Entry(f_frame, bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT, font=('Segoe UI', 9))
-            entry.insert(0, default)
-            entry.pack(fill=tk.X, ipady=3)
-            self.excel_config_entries[field] = entry
+            
+            # Use Combobox for FIRMA
+            if field == 'FIRMA':
+                firma_var = tk.StringVar(value=default)
+                try:
+                    options = []
+                    if (
+                        self.mapping_data is not None and
+                        'FIRMA' in self.mapping_data.columns
+                    ):
+                        options = sorted(
+                            set(
+                                self.mapping_data['FIRMA']
+                                .astype(str).str.strip()
+                            )
+                        )
+                    else:
+                        try:
+                            from pathlib import Path
+                            alt_path = Path('kostentreäger_info_3.xlsx')
+                            if alt_path.exists():
+                                import pandas as pd
+                                alt_df = pd.read_excel(alt_path)
+                                if 'FIRMA' in alt_df.columns:
+                                    options = sorted(
+                                        set(
+                                            alt_df['FIRMA']
+                                            .astype(str).str.strip()
+                                        )
+                                    )
+                        except Exception:
+                            pass
+                    combo = ttk.Combobox(
+                        f_frame, textvariable=firma_var,
+                        values=options, state='readonly',
+                        font=('Segoe UI', 9)
+                    )
+                    combo.pack(fill=tk.X, ipady=0)
+                    entry_widget = combo
+                except Exception:
+                    entry = tk.Entry(
+                        f_frame, bg=ModernStyle.BG_INPUT,
+                        fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT,
+                        font=('Segoe UI', 9)
+                    )
+                    entry.insert(0, default)
+                    entry.pack(fill=tk.X, ipady=3)
+                    entry_widget = entry
+            else:
+                entry = tk.Entry(
+                    f_frame, bg=ModernStyle.BG_INPUT,
+                    fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT,
+                    font=('Segoe UI', 9)
+                )
+                entry.insert(0, default)
+                entry.pack(fill=tk.X, ipady=3)
+                entry_widget = entry
+            self.excel_config_entries[field] = entry_widget
         
         # Transform button
         card4 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
@@ -493,10 +615,67 @@ class MultiProjectApp:
             f_frame = tk.Frame(card2, bg=ModernStyle.BG_CARD, pady=3)
             f_frame.pack(fill=tk.X, padx=5)
             tk.Label(f_frame, text=field, bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY, font=('Segoe UI', 9)).pack(anchor=tk.W)
-            entry = tk.Entry(f_frame, bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT, font=('Segoe UI', 9))
-            entry.insert(0, default)
-            entry.pack(fill=tk.X, ipady=3)
-            self.ocr_config_entries[field] = entry
+            
+            # Use Combobox for FIRMA
+            if field == 'FIRMA':
+                firma_var = tk.StringVar(value=default)
+                try:
+                    options = []
+                    if (
+                        self.mapping_data is not None and
+                        'FIRMA' in self.mapping_data.columns
+                    ):
+                        options = sorted(
+                            set(
+                                self.mapping_data['FIRMA']
+                                .astype(str).str.strip()
+                            )
+                        )
+                    else:
+                        try:
+                            from pathlib import Path
+                            alt_path = Path('kostentreäger_info_3.xlsx')
+                            if alt_path.exists():
+                                import pandas as pd
+                                alt_df = pd.read_excel(alt_path)
+                                if 'FIRMA' in alt_df.columns:
+                                    options = sorted(
+                                        set(
+                                            alt_df['FIRMA']
+                                            .astype(str).str.strip()
+                                        )
+                                    )
+                        except Exception:
+                            pass
+                    combo = ttk.Combobox(
+                        f_frame, textvariable=firma_var,
+                        values=options, state='readonly',
+                        font=('Segoe UI', 9)
+                    )
+                    combo.pack(fill=tk.X, ipady=0)
+                    entry_widget = combo
+                except Exception:
+                    entry = tk.Entry(
+                        f_frame, bg=ModernStyle.BG_INPUT,
+                        fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT,
+                        font=('Segoe UI', 9)
+                    )
+                    entry.insert(0, default)
+                    entry.pack(fill=tk.X, ipady=3)
+                    entry_widget = entry
+            else:
+                entry = tk.Entry(
+                    f_frame, bg=ModernStyle.BG_INPUT,
+                    fg=ModernStyle.TEXT_PRIMARY, relief=tk.FLAT,
+                    font=('Segoe UI', 9)
+                )
+                entry.insert(0, default)
+                entry.pack(fill=tk.X, ipady=3)
+                entry_widget = entry
+            self.ocr_config_entries[field] = entry_widget
+
+        # Apply settings button
+        ttk.Button(card2, text="✓ Einstellungen anwenden", style='Primary.TButton', command=self.apply_ocr_settings).pack(fill=tk.X, pady=(10, 0))
 
         card3 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
         card3.pack(fill=tk.X)
@@ -634,52 +813,80 @@ class MultiProjectApp:
         self.apply_ocr_settings()
 
     def apply_ocr_settings(self):
+        """Apply OCR settings with field validation"""
         if not getattr(self, 'raw_ocr_data', None):
             return
 
         log, df = self.raw_ocr_data
-        defaults = {k: v.get() for k, v in self.ocr_config_entries.items()}
+        if df is None or df.empty:
+            messagebox.showerror(
+                "Fehler",
+                "Keine Daten aus OCR extrahiert"
+            )
+            return
+
+        defaults = {
+            k: v.get() for k, v in self.ocr_config_entries.items()
+        }
+
+        # Import validator
+        try:
+            from ocr_analysis.field_validators import FieldValidator
+        except ImportError:
+            FieldValidator = None
 
         self.processed_data = []
-        for item in (df.to_dict('records') if df is not None else []):
-            # Invoice number: prefer explicit column, else regex from Description
-            inv_num = (item.get('Invoice Number') or '')
-            desc = item.get('Description') or item.get('text') or ''
-            if not inv_num and isinstance(desc, str):
-                import re
-                m = re.search(r'Rechnungsnummer\s*[:#]?\s*(\d+)', desc, flags=re.IGNORECASE)
-                if m:
-                    inv_num = m.group(1)
-
-            beleg_nr = inv_num or f"{item.get('Filename','')}_{item.get('Page','')}"
-
+        
+        for idx, row_data in df.iterrows():
+            # Extract invoice number from OCR data
+            inv_num = str(
+                row_data.get('Invoice Number', '')
+            ).strip()
+            
             # Date parsing (DD.MM.YYYY to YYYYMMDD)
-            date_str = item.get('Date', '')
+            date_str = str(row_data.get('Date', '')).strip()
             beleg_dat = ''
             buch_jahr = ''
             buch_monat = ''
-            try:
-                dt = pd.to_datetime(date_str, dayfirst=True, errors='coerce')
-                if not pd.isna(dt):
-                    beleg_dat = dt.strftime('%Y%m%d')
-                    buch_jahr = dt.year
-                    buch_monat = dt.month
-            except Exception:
-                pass
+            
+            if date_str and date_str != '':
+                try:
+                    dt = pd.to_datetime(
+                        date_str,
+                        dayfirst=True,
+                        errors='coerce'
+                    )
+                    if not pd.isna(dt):
+                        beleg_dat = dt.strftime('%Y%m%d')
+                        buch_jahr = dt.year
+                        buch_monat = dt.month
+                except Exception:
+                    pass
 
-            # Amount: prefer Line Total, else Total Amount; convert "6.467,22" → 646722 cents
+            # Convert amount: "1.234,56" → 123456 cents
             def euros_to_cents(val):
-                if val is None:
+                if val is None or val == '':
                     return None
                 try:
                     s = str(val).strip()
                     if s == '':
                         return None
-                    # Normalize thousands separators and decimal comma: 6.467,22 -> 6467.22
+                    
+                    # Check if already a large number (likely cents)
+                    # Pattern: no comma, large value (>1000)
+                    try:
+                        num = float(s.replace(',', '.'))
+                        # If >1000 and no comma separator, assume cents
+                        if num > 1000 and ',' not in s:
+                            return int(round(num))
+                    except Exception:
+                        pass
+                    
+                    # Convert from euros: 1.234,56 -> 123456 cents
                     parts = s.split(',')
                     if len(parts) == 2:
                         whole, frac = parts
-                        whole = whole.replace('.', '')  # remove thousand dots
+                        whole = whole.replace('.', '')
                         s = f"{whole}.{frac}"
                     else:
                         s = s.replace(',', '.')
@@ -687,47 +894,155 @@ class MultiProjectApp:
                 except Exception:
                     return None
 
-            betrag = euros_to_cents(item.get('Line Total'))
+            betrag = euros_to_cents(
+                row_data.get('Line Total')
+            )
             if betrag is None:
-                betrag = euros_to_cents(item.get('Total Amount'))
+                betrag = euros_to_cents(
+                    row_data.get('Total Amount')
+                )
 
-            # Buchungstext: build from recipient + file and description snippet
-            recipient = item.get('Recipient Name', '')
-            subject_hint = ''
-            if isinstance(desc, str):
-                subject_hint = desc.split('\n')[0][:60]
-
-            buch_text = f"{recipient} {subject_hint}".strip()
+            # Extract customer/debitor number
+            # Priority: Customer Number field, then invoice suffix
+            debi_kredi = str(
+                row_data.get('Customer Number', '')
+            ).strip()
+            
+            if not debi_kredi:
+                # Fallback to invoice suffix (number after /)
+                invoice_suffix = str(
+                    row_data.get('Invoice Suffix', '')
+                ).strip()
+                if invoice_suffix:
+                    debi_kredi = invoice_suffix
+            
+            # Build booking text
+            recipient = str(
+                row_data.get('Recipient Name', '')
+            ).strip()
+            description = str(
+                row_data.get('Description', '')
+            ).strip()[:100]
+            
+            buch_text = f"{recipient} {description}".strip()
 
             row = {
                 'SATZART': defaults.get('SATZART', 'D'),
                 'FIRMA': defaults.get('FIRMA', ''),
-                'BELEG_NR': beleg_nr,
+                'BELEG_NR': inv_num,
                 'BELEG_DAT': beleg_dat,
                 'SOLL_HABEN': defaults.get('SOLL_HABEN', ''),
                 'BUCH_KREIS': defaults.get('BUCH_KREIS', ''),
                 'BUCH_JAHR': buch_jahr,
                 'BUCH_MONAT': buch_monat,
-                'DEBI_KREDI': recipient,
-                'BETRAG': betrag if betrag is not None else '',
+                'DEBI_KREDI': debi_kredi,
+                'BETRAG': (
+                    betrag if betrag is not None else ''
+                ),
                 'RECHNUNG': inv_num or '',
                 'BUCH_TEXT': buch_text,
                 'HABENKONTO': defaults.get('HABENKONTO', ''),
                 'KOSTSTELLE': '',
                 'KOSTTRAGER': '',
                 'Kostenträgerbezeichnung': '',
-                'Bebuchbar': 'Ja'
+                'Bebuchbar': 'Ja',
+                'ocr_confidence': row_data.get(
+                    'ocr_confidence', 0.0
+                ),
+                'validation_required': row_data.get(
+                    'validation_required', False
+                )
             }
+
+            # Enrich / correct DEBI_KREDI using extended mapping if missing or shortened
+            try:
+                if self.extended_mapping is not None:
+                    debi_val = str(row.get('DEBI_KREDI', '')).strip()
+                    firma_val = str(defaults.get('FIRMA', '')).strip()
+                    matched_row = None
+                    # Criteria: empty debi OR numeric too short (< 7) OR suffix match exists in extended mapping
+                    if (not debi_val) or (len(debi_val) < 7):
+                        cand = self.extended_mapping
+                        if firma_val and 'FIRMA' in cand.columns:
+                            cand = cand[cand['FIRMA'] == firma_val]
+                        # Try exact Kostenträger match (remove leading zero if added)
+                        raw_kost = str(row.get('KOSTTRAGER', '')).lstrip('0')
+                        k_match = cand[cand['Kostenträger'].str.lstrip('0') == raw_kost]
+                        if not k_match.empty:
+                            matched_row = k_match.iloc[0]
+                            row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                        else:
+                            # Fallback: any DEBI_KREDI ending with current debi_val
+                            if debi_val:
+                                suf = cand[cand['DEBI_KREDI'].str.endswith(debi_val)]
+                                if not suf.empty:
+                                    matched_row = suf.iloc[0]
+                                    row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                    else:
+                        # If we have a short value that is suffix of a longer one, replace
+                        cand = self.extended_mapping
+                        if firma_val and 'FIRMA' in cand.columns:
+                            cand = cand[cand['FIRMA'] == firma_val]
+                        suf = cand[cand['DEBI_KREDI'].str.endswith(debi_val)]
+                        if not suf.empty and suf.iloc[0]['DEBI_KREDI'] != debi_val:
+                            matched_row = suf.iloc[0]
+                            row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                    
+                    # After enriching DEBI_KREDI, also fill cost center fields from matched row
+                    if matched_row is not None:
+                        if 'Kostenträger' in matched_row:
+                            kosttrager_from_ext = str(matched_row['Kostenträger'])
+                            if kosttrager_from_ext and not kosttrager_from_ext.startswith('0'):
+                                kosttrager_from_ext = '0' + kosttrager_from_ext
+                            row['KOSTTRAGER'] = kosttrager_from_ext
+                            
+                            if len(kosttrager_from_ext) >= 4:
+                                row['KOSTSTELLE'] = kosttrager_from_ext[:4]
+                        
+                        bez_col = 'Kostenträgerbezeichnung' if 'Kostenträgerbezeichnung' in matched_row else 'Kostenträger Bezeichnung'
+                        if bez_col in matched_row:
+                            row['Kostenträgerbezeichnung'] = str(matched_row[bez_col])
+            except Exception:
+                pass
+
+            # Run validation if available
+            if FieldValidator:
+                validation_results = FieldValidator.validate_all_fields(
+                    row
+                )
+                row['_validation'] = validation_results
+                
+                # Flag invalid fields
+                has_invalid = any(
+                    not v['valid']
+                    for v in validation_results.values()
+                )
+                if has_invalid:
+                    row['validation_required'] = True
 
             self.processed_data.append(row)
 
-        # update grid
+        # Update grid with color coding
         for item in self.tree.get_children():
             self.tree.delete(item)
 
         for row in self.processed_data:
             values = [row.get(col, '') for col in self.columns]
-            self.tree.insert('', tk.END, values=values)
+            item_id = self.tree.insert('', tk.END, values=values)
+            
+            # Tag rows needing validation
+            if row.get('validation_required', False):
+                self.tree.item(
+                    item_id,
+                    tags=('needs_validation',)
+                )
+        
+        # Configure tags for visual feedback
+        self.tree.tag_configure(
+            'needs_validation',
+            background='#fff3cd',
+            foreground='#856404'
+        )
 
     def upload_pdf_mapping(self):
         filename = filedialog.askopenfilename(title="Mapping-Datei", filetypes=[("Excel", "*.xlsx")])
@@ -760,16 +1075,74 @@ class MultiProjectApp:
     def load_stored_mapping(self):
         if self.mapping_file_path.exists():
             try:
-                self.mapping_data = pd.read_excel(self.mapping_file_path)
-                self.mapping_data['Kundennummer'] = self.mapping_data['Kundennummer'].astype(str).str.replace(' ', '')
-                self.pdf_mapping_status.config(text="✅ Datenbank aktiv", fg=ModernStyle.SUCCESS)
-            except:
-                self.pdf_mapping_status.config(text="❌ Fehler", fg='#f15e64')
+                df = pd.read_excel(self.mapping_file_path)
+                # Normalize columns to expected names
+                col_map = {
+                    'Kundennummer': 'DEBI_KREDI',
+                    'Personenkonto': 'DEBI_KREDI',
+                    'Kostenträgerbezeichnung': 'Kostenträger Bezeichnung',
+                }
+                df = df.rename(columns=col_map)
+                # Ensure key columns exist
+                # Support both old and new schema
+                for needed in ['DEBI_KREDI', 'Kostenträger']:
+                    if needed not in df.columns:
+                        raise ValueError(f"Spalte fehlt: {needed}")
+                # Clean data types
+                df['DEBI_KREDI'] = (
+                    df['DEBI_KREDI'].astype(str).str.replace(' ', '')
+                )
+                if 'FIRMA' in df.columns:
+                    df['FIRMA'] = df['FIRMA'].astype(str).str.strip()
+                if 'Kostenträger Bezeichnung' in df.columns:
+                    df['Kostenträger Bezeichnung'] = (
+                        df['Kostenträger Bezeichnung'].astype(str)
+                    )
+                self.mapping_data = df
+                self.pdf_mapping_status.config(
+                    text="✅ Datenbank aktiv",
+                    fg=ModernStyle.SUCCESS
+                )
+            except Exception as e:
+                self.pdf_mapping_status.config(
+                    text=f"❌ Fehler: {e}",
+                    fg='#f15e64'
+                )
         else:
-            self.pdf_mapping_status.config(text="Keine Datenbank", fg=ModernStyle.TEXT_SECONDARY)
+            self.pdf_mapping_status.config(
+                text="Keine Datenbank",
+                fg=ModernStyle.TEXT_SECONDARY
+            )
+
+    def load_extended_mapping(self):
+        """Load extended mapping file (kostentreäger_info_3.xlsx) if present for DEBI_KREDI enrichment."""
+        try:
+            ext_path = Path('kostentreäger_info_3.xlsx')
+            if not ext_path.exists():
+                return
+            df = pd.read_excel(ext_path)
+            # Basic column normalization
+            rename_map = {
+                'Kostenträger Bezeichnung': 'Kostenträgerbezeichnung'
+            }
+            df = df.rename(columns=rename_map)
+            needed_cols = ['FIRMA', 'DEBI_KREDI', 'Kostenträger']
+            for c in needed_cols:
+                if c not in df.columns:
+                    return  # silently ignore if structure unexpected
+            df['FIRMA'] = df['FIRMA'].astype(str).str.strip()
+            df['DEBI_KREDI'] = df['DEBI_KREDI'].astype(str).str.strip()
+            df['Kostenträger'] = df['Kostenträger'].astype(str).str.strip()
+            if 'Kostenträgerbezeichnung' in df.columns:
+                df['Kostenträgerbezeichnung'] = df['Kostenträgerbezeichnung'].astype(str)
+            self.extended_mapping = df
+        except Exception:
+            # Non-fatal; extended mapping optional
+            self.extended_mapping = None
 
     def apply_pdf_settings(self):
-        if not self.raw_pdf_data: return
+        if not self.raw_pdf_data:
+            return
         
         settings = {k: v.get() for k, v in self.pdf_config_entries.items()}
         buch_text_template = self.pdf_buch_text_entry.get()
@@ -785,11 +1158,14 @@ class MultiProjectApp:
             buch_monat = ""
             if item.get('invoice_date'):
                 try:
-                    date_obj = pd.to_datetime(item['invoice_date'], dayfirst=True)
+                    date_obj = pd.to_datetime(
+                        item['invoice_date'], dayfirst=True
+                    )
                     beleg_dat = date_obj.strftime('%Y%m%d')
                     buch_jahr = date_obj.year
                     buch_monat = date_obj.month
-                except: pass
+                except Exception:
+                    pass
                 
             betrag = int(item.get('amount', 0) * 100)
             
@@ -802,18 +1178,66 @@ class MultiProjectApp:
             
             kosttrager = settings['KOSTTRAGER']
             kost_bez = settings['Kostenträgerbezeichnung']
-            
-            if self.mapping_data is not None and item.get('customer_number'):
-                cust_num = str(item.get('customer_number')).replace(' ', '')
-                match = self.mapping_data[self.mapping_data['Kundennummer'] == cust_num]
-                if not match.empty:
-                    kosttrager = str(match.iloc[0]['Kostenträger'])
-                    kost_bez = str(match.iloc[0]['Kostenträgerbezeichnung'])
+
+            # New mapping: filter by FIRMA, then find closest DEBI_KREDI match
+            if self.mapping_data is not None:
+                firma_input = str(settings.get('FIRMA', '')).strip()
+                debi_kredi_extracted = str(
+                    item.get('customer_number', '')
+                ).replace(' ', '')
+                df = self.mapping_data.copy()
+                if firma_input and 'FIRMA' in df.columns:
+                    df = df[df['FIRMA'] == firma_input]
+                # Try exact match on DEBI_KREDI
+                exact = df[df['DEBI_KREDI'] == debi_kredi_extracted]
+                chosen = None
+                if not exact.empty:
+                    chosen = exact.iloc[0]
+                else:
+                    # If no exact, compute numeric distance for closest match
+                    try:
+                        target = int(
+                            ''.join(
+                                filter(
+                                    str.isdigit,
+                                    debi_kredi_extracted or '0'
+                                )
+                            )
+                        )
+                        df_num = df.assign(
+                            _num=df['DEBI_KREDI'].apply(
+                                lambda s: int(
+                                    ''.join(
+                                        filter(str.isdigit, str(s))
+                                    ) or 0
+                                )
+                            )
+                        )
+                        if not df_num.empty:
+                            df_num = df_num.assign(
+                                _dist=(df_num['_num'] - target).abs()
+                            )
+                            chosen = df_num.sort_values('_dist').iloc[0]
+                    except Exception:
+                        pass
+                if chosen is not None:
+                    # Support both label variants for description
+                    kosttrager = str(chosen['Kostenträger'])
+                    bez_col = (
+                        'Kostenträger Bezeichnung'
+                        if 'Kostenträger Bezeichnung' in df.columns
+                        else 'Kostenträgerbezeichnung'
+                    )
+                    kost_bez = str(chosen.get(bez_col, kost_bez))
             
             if kosttrager and not kosttrager.startswith('0'):
                 kosttrager = '0' + kosttrager
                 
-            koststelle = kosttrager[:4] if kosttrager and len(kosttrager) >= 4 else settings['KOSTSTELLE']
+            koststelle = (
+                kosttrager[:4]
+                if kosttrager and len(kosttrager) >= 4
+                else settings['KOSTSTELLE']
+            )
             
             row = {
                 'SATZART': settings['SATZART'],
@@ -834,24 +1258,117 @@ class MultiProjectApp:
                 'Kostenträgerbezeichnung': kost_bez,
                 'Bebuchbar': settings['Bebuchbar']
             }
+
+            # Enrich / correct DEBI_KREDI using extended mapping if missing or shortened
+            try:
+                if self.extended_mapping is not None:
+                    debi_val = str(row.get('DEBI_KREDI', '')).strip()
+                    firma_val = str(row.get('FIRMA', '')).strip()
+                    matched_row = None
+                    # Criteria: empty debi OR numeric too short (< 7) OR suffix match exists in extended mapping
+                    if (not debi_val) or (len(debi_val) < 7):
+                        cand = self.extended_mapping
+                        if firma_val and 'FIRMA' in cand.columns:
+                            cand = cand[cand['FIRMA'] == firma_val]
+                        # Try exact Kostenträger match (remove leading zero if added)
+                        raw_kost = str(row.get('KOSTTRAGER', '')).lstrip('0')
+                        k_match = cand[cand['Kostenträger'].str.lstrip('0') == raw_kost]
+                        if not k_match.empty:
+                            matched_row = k_match.iloc[0]
+                            row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                        else:
+                            # Fallback: any DEBI_KREDI ending with current debi_val
+                            if debi_val:
+                                suf = cand[cand['DEBI_KREDI'].str.endswith(debi_val)]
+                                if not suf.empty:
+                                    matched_row = suf.iloc[0]
+                                    row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                    else:
+                        # If we have a short value that is suffix of a longer one, replace
+                        cand = self.extended_mapping
+                        if firma_val and 'FIRMA' in cand.columns:
+                            cand = cand[cand['FIRMA'] == firma_val]
+                        suf = cand[cand['DEBI_KREDI'].str.endswith(debi_val)]
+                        if not suf.empty and suf.iloc[0]['DEBI_KREDI'] != debi_val:
+                            matched_row = suf.iloc[0]
+                            row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                    
+                    # After enriching DEBI_KREDI, also fill cost center fields from matched row
+                    if matched_row is not None:
+                        if 'Kostenträger' in matched_row:
+                            kosttrager_from_ext = str(matched_row['Kostenträger'])
+                            if kosttrager_from_ext and not kosttrager_from_ext.startswith('0'):
+                                kosttrager_from_ext = '0' + kosttrager_from_ext
+                            row['KOSTTRAGER'] = kosttrager_from_ext
+                            
+                            if len(kosttrager_from_ext) >= 4:
+                                row['KOSTSTELLE'] = kosttrager_from_ext[:4]
+                        
+                        bez_col = 'Kostenträgerbezeichnung' if 'Kostenträgerbezeichnung' in matched_row else 'Kostenträger Bezeichnung'
+                        if bez_col in matched_row:
+                            row['Kostenträgerbezeichnung'] = str(matched_row[bez_col])
+            except Exception:
+                pass
             
             self.processed_data.append(row)
             values = [row.get(col, '') for col in self.columns]
             self.tree.insert('', tk.END, values=values)
+
+    def preview_pdf_matches(self):
+        """Preview how many rows will get mapped with current FIRMA."""
+        try:
+            if self.mapping_data is None:
+                messagebox.showerror("Fehler", "Keine Mapping-Datenbank geladen.")
+                return
+            firma = ''
+            # Get FIRMA from combobox or entry
+            firma_widget = self.pdf_config_entries.get('FIRMA')
+            if isinstance(firma_widget, ttk.Combobox):
+                firma = firma_widget.get().strip()
+            else:
+                firma = firma_widget.get().strip()
+            df = self.mapping_data
+            if 'FIRMA' in df.columns:
+                df = df[df['FIRMA'].astype(str).str.strip() == str(firma)]
+            total = len(self.raw_pdf_data or [])
+            mapped = 0
+            for item in self.raw_pdf_data or []:
+                debi = str(item.get('customer_number', '')).replace(' ', '')
+                exact = df[df['DEBI_KREDI'].astype(str) == debi]
+                if not exact.empty:
+                    mapped += 1
+            messagebox.showinfo(
+                "Vorschau",
+                f"FIRMA {firma}: {mapped}/{total} Einträge mit exaktem Match."
+            )
+        except Exception as e:
+            messagebox.showerror("Fehler", str(e))
     
     # Excel Transformer Methods
     def select_template(self):
-        filename = filedialog.askopenfilename(title="Template wählen", filetypes=[("Excel", "*.xlsx")])
+        filename = filedialog.askopenfilename(
+            title="Template wählen",
+            filetypes=[("Excel", "*.xlsx")]
+        )
         if filename:
             self.template_path = filename
-            self.template_label.config(text=Path(filename).name, fg=ModernStyle.TEXT_PRIMARY)
+            self.template_label.config(
+                text=Path(filename).name,
+                fg=ModernStyle.TEXT_PRIMARY
+            )
             self._check_excel_ready()
 
     def select_source(self):
-        filename = filedialog.askopenfilename(title="Quelldatei wählen", filetypes=[("Excel", "*.xlsx")])
+        filename = filedialog.askopenfilename(
+            title="Quelldatei wählen",
+            filetypes=[("Excel", "*.xlsx")]
+        )
         if filename:
             self.source_path = filename
-            self.source_label.config(text=Path(filename).name, fg=ModernStyle.TEXT_PRIMARY)
+            self.source_label.config(
+                text=Path(filename).name,
+                fg=ModernStyle.TEXT_PRIMARY
+            )
             self._check_excel_ready()
 
     def _check_excel_ready(self):
@@ -859,10 +1376,13 @@ class MultiProjectApp:
             self.excel_transform_btn.config(state=tk.NORMAL)
 
     def transform_excel_data(self):
-        if not self.template_path or not self.source_path: return
+        if not self.template_path or not self.source_path:
+            return
         
         try:
-            defaults = {k: v.get() for k, v in self.excel_config_entries.items()}
+            defaults = {
+                k: v.get() for k, v in self.excel_config_entries.items()
+            }
             
             self.processed_data = bereitspf_transform(
                 self.source_path,
@@ -876,16 +1396,56 @@ class MultiProjectApp:
                 customer_num = row.get('DEBI_KREDI', '')
                 
                 # Default Kostenträger from settings
-                kosttrager = row.get('KOSTTRAGER', defaults.get('KOSTTRAGER', ''))
+                kosttrager = row.get(
+                    'KOSTTRAGER', defaults.get('KOSTTRAGER', '')
+                )
                 kost_bez = row.get('Kostenträgerbezeichnung', '')
                 
-                # Check mapping database
-                if self.mapping_data is not None and customer_num:
-                    cust_num = str(customer_num).replace(' ', '')
-                    match = self.mapping_data[self.mapping_data['Kundennummer'] == cust_num]
-                    if not match.empty:
-                        kosttrager = str(match.iloc[0]['Kostenträger'])
-                        kost_bez = str(match.iloc[0]['Kostenträgerbezeichnung'])
+                # New mapping: filter by FIRMA, then closest DEBI_KREDI
+                if self.mapping_data is not None:
+                    firma_input = str(defaults.get('FIRMA', '')).strip()
+                    debi_kredi_extracted = str(customer_num).replace(' ', '')
+                    df = self.mapping_data.copy()
+                    if firma_input and 'FIRMA' in df.columns:
+                        df = df[df['FIRMA'] == firma_input]
+                    exact = df[df['DEBI_KREDI'] == debi_kredi_extracted]
+                    chosen = None
+                    if not exact.empty:
+                        chosen = exact.iloc[0]
+                    else:
+                        try:
+                            target = int(
+                                ''.join(
+                                    filter(
+                                        str.isdigit,
+                                        debi_kredi_extracted or '0'
+                                    )
+                                )
+                            )
+                            df_num = df.assign(
+                                _num=df['DEBI_KREDI'].apply(
+                                    lambda s: int(
+                                        ''.join(
+                                            filter(str.isdigit, str(s))
+                                        ) or 0
+                                    )
+                                )
+                            )
+                            if not df_num.empty:
+                                df_num = df_num.assign(
+                                    _dist=(df_num['_num'] - target).abs()
+                                )
+                                chosen = df_num.sort_values('_dist').iloc[0]
+                        except Exception:
+                            pass
+                    if chosen is not None:
+                        kosttrager = str(chosen['Kostenträger'])
+                        bez_col = (
+                            'Kostenträger Bezeichnung'
+                            if 'Kostenträger Bezeichnung' in df.columns
+                            else 'Kostenträgerbezeichnung'
+                        )
+                        kost_bez = str(chosen.get(bez_col, kost_bez))
                 
                 # Logic: Ensure Kostenträger starts with 0
                 if kosttrager and not str(kosttrager).startswith('0'):
@@ -895,7 +1455,9 @@ class MultiProjectApp:
                 if kosttrager and len(str(kosttrager)) >= 4:
                     koststelle = str(kosttrager)[:4]
                 else:
-                    koststelle = row.get('KOSTSTELLE', defaults.get('KOSTSTELLE', ''))
+                    koststelle = row.get(
+                        'KOSTSTELLE', defaults.get('KOSTSTELLE', '')
+                    )
                     # Also ensure Koststelle starts with 0
                     if koststelle and not str(koststelle).startswith('0'):
                         koststelle = '0' + str(koststelle)
@@ -904,6 +1466,52 @@ class MultiProjectApp:
                 row['KOSTTRAGER'] = kosttrager
                 row['KOSTSTELLE'] = koststelle
                 row['Kostenträgerbezeichnung'] = kost_bez
+
+                # Enrich / correct DEBI_KREDI in transformer mode
+                try:
+                    if self.extended_mapping is not None:
+                        debi_val = str(row.get('DEBI_KREDI', '')).strip()
+                        firma_val = str(defaults.get('FIRMA', '')).strip()
+                        matched_row = None
+                        if (not debi_val) or (len(debi_val) < 7):
+                            cand = self.extended_mapping
+                            if firma_val and 'FIRMA' in cand.columns:
+                                cand = cand[cand['FIRMA'] == firma_val]
+                            raw_kost = str(row.get('KOSTTRAGER', '')).lstrip('0')
+                            k_match = cand[cand['Kostenträger'].str.lstrip('0') == raw_kost]
+                            if not k_match.empty:
+                                matched_row = k_match.iloc[0]
+                                row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                            elif debi_val:
+                                suf = cand[cand['DEBI_KREDI'].str.endswith(debi_val)]
+                                if not suf.empty:
+                                    matched_row = suf.iloc[0]
+                                    row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                        else:
+                            cand = self.extended_mapping
+                            if firma_val and 'FIRMA' in cand.columns:
+                                cand = cand[cand['FIRMA'] == firma_val]
+                            suf = cand[cand['DEBI_KREDI'].str.endswith(debi_val)]
+                            if not suf.empty and suf.iloc[0]['DEBI_KREDI'] != debi_val:
+                                matched_row = suf.iloc[0]
+                                row['DEBI_KREDI'] = matched_row['DEBI_KREDI']
+                        
+                        # After enriching DEBI_KREDI, also fill cost center fields
+                        if matched_row is not None:
+                            if 'Kostenträger' in matched_row:
+                                kosttrager_from_ext = str(matched_row['Kostenträger'])
+                                if kosttrager_from_ext and not kosttrager_from_ext.startswith('0'):
+                                    kosttrager_from_ext = '0' + kosttrager_from_ext
+                                row['KOSTTRAGER'] = kosttrager_from_ext
+                                
+                                if len(kosttrager_from_ext) >= 4:
+                                    row['KOSTSTELLE'] = kosttrager_from_ext[:4]
+                            
+                            bez_col = 'Kostenträgerbezeichnung' if 'Kostenträgerbezeichnung' in matched_row else 'Kostenträger Bezeichnung'
+                            if bez_col in matched_row:
+                                row['Kostenträgerbezeichnung'] = str(matched_row[bez_col])
+                except Exception:
+                    pass
             
             # Clear and repopulate grid
             for item in self.tree.get_children():
@@ -914,7 +1522,10 @@ class MultiProjectApp:
                 self.tree.insert('', tk.END, values=values)
             
             self.excel_export_btn.config(state=tk.NORMAL)
-            messagebox.showinfo("Erfolg", f"{len(self.processed_data)} Einträge transformiert!")
+            messagebox.showinfo(
+                "Erfolg",
+                f"{len(self.processed_data)} Einträge transformiert!"
+            )
             
         except Exception as e:
             messagebox.showerror("Fehler", str(e))
@@ -928,18 +1539,25 @@ class MultiProjectApp:
             self.processed_data.append(row)
 
     def export_excel(self):
-        filename = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")])
-        if not filename: return
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel", "*.xlsx")]
+        )
+        if not filename:
+            return
         
         try:
             df = pd.DataFrame(self.processed_data)
             
             all_columns = [
-                'SATZART', 'FIRMA', 'BELEG_NR', 'BELEG_DAT', 'SOLL_HABEN', 'BUCH_KREIS',
-                'BUCH_JAHR', 'BUCH_MONAT', 'DEBI_KREDI', 'BETRAG', 'RECHNUNG', 'leer',
+                'SATZART', 'FIRMA', 'BELEG_NR', 'BELEG_DAT',
+                'SOLL_HABEN', 'BUCH_KREIS',
+                'BUCH_JAHR', 'BUCH_MONAT', 'DEBI_KREDI', 'BETRAG',
+                'RECHNUNG', 'leer',
                 'BUCH_TEXT', 'HABENKONTO', 'SOLLKONTO', 'leer_1', 'KOSTSTELLE',
                 'KOSTTRAGER', 'Kostenträgerbezeichnung', 'Bebuchbar',
-                'Debitoren.Bezeichnung', 'Debitoren.Aktuelle Anschrift Anschrift-Zusatz',
+                'Debitoren.Bezeichnung',
+                'Debitoren.Aktuelle Anschrift Anschrift-Zusatz',
                 'AbgBenutzerdefiniert'
             ]
             
@@ -949,7 +1567,10 @@ class MultiProjectApp:
                     
             df = df[all_columns]
             df.to_excel(filename, index=False, engine='openpyxl')
-            messagebox.showinfo("Erfolg", f"Datei gespeichert:\n{Path(filename).name}")
+            messagebox.showinfo(
+                "Erfolg",
+                f"Datei gespeichert:\n{Path(filename).name}"
+            )
             
         except Exception as e:
             messagebox.showerror("Fehler", str(e))

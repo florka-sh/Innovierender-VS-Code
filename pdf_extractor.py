@@ -1,12 +1,48 @@
 """
-PDF Invoice Extractor Module
-Extracts invoice data from PDF files for learning support (Lernförderung) invoices.
+PDF Invoice Extractor Module.
+Extracts Lernförderung invoice data from PDF files.
 """
 
 import pdfplumber
 import re
 from datetime import datetime
 from typing import List, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Pre-compile regex patterns for performance
+INVOICE_NUMBER_PATTERN = re.compile(r'Rechnun[gq]snummer:\s*(\d+)')
+CUSTOMER_NUMBER_PATTERN = re.compile(r'Kunden-Nummer:\s*([0-9\s]+)')
+INVOICE_DATE_PATTERN = re.compile(
+    r'Rechnun[gq]sdatum:\s*(\d{2}\.\d{2}\.\d{4})'
+)
+COURSE_PATTERN = re.compile(
+    r'(\d{2}/\d{2})\s+([^\d]+?)\s+(\d+)\s+Zeitstunden?\s+á\s+'
+    r'([\d,]+)\s*€'
+)
+ACCOUNT_CODE_PATTERN = re.compile(r'(\d{5}/\d{4}\s+\d+)')
+STUDENT_NAME_PATTERN = re.compile(
+    r'Durchführung einer Lernförderung für:\s*\n([^\n]+)'
+)
+SCHOOL_PATTERN = re.compile(
+    r'Durchführung einer Lernförderung für:\s*\n[^\n]+\s*\n([^\n]+)'
+)
+
+# Bereitschaftspflege (care) invoice patterns
+CARE_KEYWORD_PATTERN = re.compile(r'Bereitschaftspflege', re.IGNORECASE)
+CARE_LINES_START_PATTERN = re.compile(
+    r'Folgende Leistungen wurden erbracht', re.IGNORECASE
+)
+CARE_LINE_ITEM_PATTERN = re.compile(
+    r'^\s*(\d+)\s+(.+?)\s+([0-9\.,]+)\s*€\s*$', re.MULTILINE
+)
+CARE_NETTO_PATTERN = re.compile(r'Nettobetrag\s*([0-9\.]+,\d{2})')
+CARE_DEDUCTION_PATTERN = re.compile(
+    r'abzüg.*?(-?[0-9\.]+,\d{2})', re.IGNORECASE
+)
+CARE_TOTAL_PATTERN = re.compile(r'Rechnungsbetrag\s*([0-9\.]+,\d{2})')
+CARE_PAYMENT_PATTERN = re.compile(r'Zahlbetrag\s*([0-9\.]+,\d{2})')
 
 
 def extract_invoices(pdf_path: str) -> List[Dict[str, Any]]:
@@ -21,15 +57,21 @@ def extract_invoices(pdf_path: str) -> List[Dict[str, Any]]:
     """
     invoices = []
     
-    with pdfplumber.open(pdf_path) as pdf:
-        for page_num, page in enumerate(pdf.pages, 1):
-            try:
-                invoice_data = extract_page_data(page, page_num)
-                if invoice_data:
-                    invoices.extend(invoice_data)
-            except Exception as e:
-                print(f"Error processing page {page_num}: {str(e)}")
-                continue
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page_num, page in enumerate(pdf.pages, 1):
+                try:
+                    invoice_data = extract_page_data(page, page_num)
+                    if invoice_data:
+                        invoices.extend(invoice_data)
+                except Exception as e:
+                    logger.warning(
+                        f"Error processing page {page_num}: {str(e)}"
+                    )
+                    continue
+    except Exception as e:
+        logger.error(f"Error opening PDF {pdf_path}: {str(e)}")
+        raise
     
     return invoices
 
@@ -37,6 +79,7 @@ def extract_invoices(pdf_path: str) -> List[Dict[str, Any]]:
 def extract_page_data(page, page_num: int) -> List[Dict[str, Any]]:
     """
     Extract invoice data from a single page.
+    Supports both Lernförderung and Bereitschaftspflege formats.
     
     Args:
         page: pdfplumber page object
@@ -45,58 +88,141 @@ def extract_page_data(page, page_num: int) -> List[Dict[str, Any]]:
     Returns:
         List of invoice line items
     """
-    text = page.extract_text()
+    text = page.extract_text() or ''
     tables = page.extract_tables()
     
-    # Extract metadata from the first table (invoice header)
-    metadata = {}
-    if tables and len(tables) > 0:
-        header_table = tables[0]
-        for row in header_table:
-            if row[0] and 'Rechnungsnummer' in row[0]:
-                metadata['invoice_number'] = row[1].strip() if row[1] else None
-            elif row[0] and 'Rechnungsdatum' in row[0]:
-                metadata['invoice_date'] = row[1].strip() if row[1] else None
-            elif row[0] and 'Kunden-Nummer' in row[0]:
-                metadata['customer_number'] = row[1].replace(' ', '') if row[1] else None
+    # Detect invoice type
+    is_care_invoice = bool(CARE_KEYWORD_PATTERN.search(text))
+    metadata = _extract_metadata_from_table(tables, text)
     
-    # Extract customer number from text if not found in table
-    if not metadata.get('customer_number'):
-        customer_match = re.search(r'Kunden-Nummer:\s*([0-9\s]+)', text)
-        if customer_match:
-            metadata['customer_number'] = customer_match.group(1).replace(' ', '')
+    # For care invoices, extract metadata from text patterns
+    if is_care_invoice:
+        if not metadata.get('invoice_number'):
+            inv_match = INVOICE_NUMBER_PATTERN.search(text)
+            if inv_match:
+                metadata['invoice_number'] = inv_match.group(1).strip()
+        if not metadata.get('invoice_date'):
+            date_match = INVOICE_DATE_PATTERN.search(text)
+            if date_match:
+                metadata['invoice_date'] = date_match.group(1).strip()
+        if not metadata.get('customer_number'):
+            cust_match = CUSTOMER_NUMBER_PATTERN.search(text)
+            if cust_match:
+                metadata['customer_number'] = (
+                    cust_match.group(1).replace(' ', '').strip()
+                )
     
-    # Extract invoice number from text if not found
-    if not metadata.get('invoice_number'):
-        inv_match = re.search(r'Rechnungsnummer:\s*(\d+)', text)
-        if inv_match:
-            metadata['invoice_number'] = inv_match.group(1)
-    
-    # Extract date from text if not found
-    if not metadata.get('invoice_date'):
-        date_match = re.search(r'Rechnungsdatum:\s*(\d{2}\.\d{2}\.\d{4})', text)
-        if date_match:
-            metadata['invoice_date'] = date_match.group(1)
-    
-    # Extract line items from the second table (invoice details)
     line_items = []
-    if tables and len(tables) > 1:
-        detail_table = tables[1]
+    
+    if is_care_invoice:
+        # Parse Bereitschaftspflege format
+        lines = text.splitlines()
+        collecting = False
         
-        # Find student name, school, and course details
-        student_info = extract_student_info(text)
-        
-        for row in detail_table[1:]:  # Skip header row
-            if not row or not row[0]:
+        for line in lines:
+            if CARE_LINES_START_PATTERN.search(line):
+                collecting = True
+                continue
+            if not collecting:
+                continue
+            if CARE_NETTO_PATTERN.search(line):
+                collecting = False
                 continue
                 
-            # Check if this is a line item row (has line number)
-            if row[0] and row[0].strip().isdigit():
-                # Extract course details from the middle column
-                course_text = row[1] if len(row) > 1 and row[1] else ""
-                amount_text = row[2] if len(row) > 2 and row[2] else ""
+            m = CARE_LINE_ITEM_PATTERN.match(line)
+            if not m:
+                continue
                 
-                # Parse course lines (e.g., "10/25 Deutsch 1 Zeitstunden á 25,00 €")
+            line_no, desc, amt = m.groups()
+            desc_clean = desc.strip()
+            
+            # Remove daily rate from description (e.g., "94,02€")
+            desc_clean = re.sub(r'\s*[0-9\.,]+€', '', desc_clean).strip()
+            
+            # Extract month/year if present
+            month_year_match = re.search(
+                r'\b([A-Za-z]{3}\s+\d{2})\b', desc_clean
+            )
+            month_year = month_year_match.group(1) if month_year_match else ''
+            
+            def to_float(s: str) -> float:
+                if not s:
+                    return 0.0
+                cleaned = s.replace('€', '').replace('.', '')
+                cleaned = cleaned.replace(',', '.').strip()
+                try:
+                    return float(cleaned)
+                except ValueError:
+                    return 0.0
+            
+            amount_val = to_float(amt)
+            
+            item = {
+                'page_num': page_num,
+                'invoice_number': metadata.get('invoice_number'),
+                'invoice_date': metadata.get('invoice_date'),
+                'customer_number': metadata.get('customer_number'),
+                'student_name': '',
+                'school': '',
+                'month_year': month_year,
+                'subject': desc_clean,
+                'hours': '',
+                'rate': '',
+                'amount': amount_val,
+                'account_code': '',
+                'care_mode': True
+            }
+            line_items.append(item)
+        
+        # Extract totals
+        def parse_amount(pattern):
+            m = pattern.search(text)
+            if not m:
+                return 0.0
+            return float(m.group(1).replace('.', '').replace(',', '.'))
+        
+        netto = parse_amount(CARE_NETTO_PATTERN)
+        total = parse_amount(CARE_TOTAL_PATTERN)
+        deduction = parse_amount(CARE_DEDUCTION_PATTERN)
+        zahlbetrag = parse_amount(CARE_PAYMENT_PATTERN)
+        
+        if any([netto, total, zahlbetrag]):
+            summary = {
+                'page_num': page_num,
+                'invoice_number': metadata.get('invoice_number'),
+                'invoice_date': metadata.get('invoice_date'),
+                'customer_number': metadata.get('customer_number'),
+                'student_name': '',
+                'school': '',
+                'month_year': '',
+                'subject': 'SUMME (Bereitschaftspflege)',
+                'hours': '',
+                'rate': '',
+                'amount': zahlbetrag if zahlbetrag else (
+                    total if total else netto
+                ),
+                'account_code': '',
+                'care_mode': True,
+                'netto': netto,
+                'rechnungsbetrag': total,
+                'abschlag': deduction,
+                'zahlbetrag': zahlbetrag if zahlbetrag else total
+            }
+            line_items.append(summary)
+        
+        return line_items
+    
+    # Lernförderung parsing (existing logic)
+    if tables and len(tables) > 1:
+        detail_table = tables[1]
+        student_info = extract_student_info(text)
+        
+        for row in detail_table[1:]:
+            if not row or not row[0]:
+                continue
+            
+            if row[0] and row[0].strip().isdigit():
+                course_text = row[1] if len(row) > 1 and row[1] else ""
                 courses = parse_courses(course_text)
                 
                 for course in courses:
@@ -113,10 +239,55 @@ def extract_page_data(page, page_num: int) -> List[Dict[str, Any]]:
                         'rate': course.get('rate'),
                         'amount': course.get('amount'),
                         'account_code': student_info.get('account_code'),
+                        'care_mode': False
                     }
                     line_items.append(item)
     
     return line_items
+
+
+def _extract_metadata_from_table(
+    tables: List, text: str
+) -> Dict[str, str]:
+    """Extract invoice metadata from tables and text."""
+    metadata = {}
+    if tables and len(tables) > 0:
+        header_table = tables[0]
+        for row in header_table:
+            if not row[0]:
+                continue
+            if 'Rechnungsnummer' in row[0]:
+                metadata['invoice_number'] = (
+                    row[1].strip() if row[1] else None
+                )
+            elif 'Rechnungsdatum' in row[0]:
+                metadata['invoice_date'] = (
+                    row[1].strip() if row[1] else None
+                )
+            elif 'Kunden-Nummer' in row[0]:
+                metadata['customer_number'] = (
+                    row[1].replace(' ', '') if row[1] else None
+                )
+    
+    # Extract from text if not found in table
+    if not metadata.get('customer_number'):
+        match = CUSTOMER_NUMBER_PATTERN.search(text)
+        if match:
+            metadata['customer_number'] = match.group(1).replace(
+                ' ', ''
+            )
+    
+    if not metadata.get('invoice_number'):
+        match = INVOICE_NUMBER_PATTERN.search(text)
+        if match:
+            metadata['invoice_number'] = match.group(1)
+    
+    if not metadata.get('invoice_date'):
+        match = INVOICE_DATE_PATTERN.search(text)
+        if match:
+            metadata['invoice_date'] = match.group(1)
+    
+    return metadata
 
 
 def extract_student_info(text: str) -> Dict[str, str]:
@@ -131,21 +302,21 @@ def extract_student_info(text: str) -> Dict[str, str]:
     """
     info = {}
     
-    # Extract student name (line after "Durchführung einer Lernförderung für:")
-    name_match = re.search(r'Durchführung einer Lernförderung für:\s*\n([^\n]+)', text)
+    # Extract student name
+    name_match = STUDENT_NAME_PATTERN.search(text)
     if name_match:
         info['student_name'] = name_match.group(1).strip()
     
-    # Extract school name (typically the line after student name)
-    school_match = re.search(r'Durchführung einer Lernförderung für:\s*\n[^\n]+\s*\n([^\n]+)', text)
+    # Extract school name
+    school_match = SCHOOL_PATTERN.search(text)
     if school_match:
         school_line = school_match.group(1).strip()
         # Check if it looks like a school name (not a course line)
         if not re.match(r'\d{2}/\d{2}', school_line):
             info['school'] = school_line
     
-    # Extract account code (pattern like "42100/0111 121512520")
-    code_match = re.search(r'(\d{5}/\d{4}\s+\d+)', text)
+    # Extract account code
+    code_match = ACCOUNT_CODE_PATTERN.search(text)
     if code_match:
         info['account_code'] = code_match.group(1).strip()
     
@@ -163,14 +334,11 @@ def parse_courses(course_text: str) -> List[Dict[str, Any]]:
         List of course dictionaries
     """
     courses = []
-    
-    # Pattern: "10/25 Deutsch 1 Zeitstunden á 25,00 €" or similar
-    # Also handles amounts like "25,00 €" on separate lines
     lines = course_text.split('\n')
     
     for line in lines:
         # Match pattern: MM/YY Subject Hours Zeitstunden á Rate €
-        match = re.search(r'(\d{2}/\d{2})\s+([^\d]+?)\s+(\d+)\s+Zeitstunden?\s+á\s+([\d,]+)\s*€', line)
+        match = COURSE_PATTERN.search(line)
         if match:
             month_year = match.group(1)
             subject = match.group(2).strip()
