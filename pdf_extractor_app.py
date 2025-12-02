@@ -78,7 +78,7 @@ class EditableTreeview(ttk.Treeview):
 class MultiProjectApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Invoice Processing App")
+        self.root.title("Rechnungsverarbeitung | Invoice Processing")
         
         # Window setup
         window_width = 1400
@@ -244,9 +244,10 @@ class MultiProjectApp:
         card1 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
         card1.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(card1, text="1. PDF-Datei", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 10))
+        ttk.Label(card1, text="1. PDF-Datei", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        tk.Label(card1, text="Wählen Sie eine Rechnung im PDF-Format aus", bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY, font=('Segoe UI', 8)).pack(anchor=tk.W, pady=(0, 5))
         
-        self.pdf_file_label = tk.Label(card1, text="Keine Datei", bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_SECONDARY, anchor=tk.W)
+        self.pdf_file_label = tk.Label(card1, text="📄 Keine Datei ausgewählt", bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_SECONDARY, anchor=tk.W)
         self.pdf_file_label.pack(fill=tk.X, pady=(0, 10), ipady=5)
         
         btn_frame = tk.Frame(card1, bg=ModernStyle.BG_CARD)
@@ -263,18 +264,20 @@ class MultiProjectApp:
         card2 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
         card2.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(card2, text="Mapping-Datenbank", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 10))
+        ttk.Label(card2, text="💾 Mapping-Datenbank", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        tk.Label(card2, text="Verknüpft Kundennummern mit Kostenträgern", bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY, font=('Segoe UI', 8)).pack(anchor=tk.W, pady=(0, 5))
         
-        self.pdf_mapping_status = tk.Label(card2, text="Keine Datenbank", bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY)
+        self.pdf_mapping_status = tk.Label(card2, text="⚠️  Keine Datenbank geladen", bg=ModernStyle.BG_CARD, fg='#ff9800', font=('Segoe UI', 9, 'bold'))
         self.pdf_mapping_status.pack(fill=tk.X, pady=(0,  10))
         
-        ttk.Button(card2, text="📂 Datenbank hochladen", style='Primary.TButton', command=self.upload_pdf_mapping).pack(fill=tk.X)
+        ttk.Button(card2, text="📂 Datenbank laden", style='Primary.TButton', command=self.upload_pdf_mapping).pack(fill=tk.X)
         
         # Settings card with scrollable area
         card3 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
         card3.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
         
-        ttk.Label(card3, text="2. Einstellungen", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 10))
+        ttk.Label(card3, text="2. Einstellungen", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        tk.Label(card3, text="Standard-Werte für neue Einträge (anpassbar nach Extraktion)", bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY, font=('Segoe UI', 8)).pack(anchor=tk.W, pady=(0, 5))
         
         canvas = tk.Canvas(card3, bg=ModernStyle.BG_CARD, highlightthickness=0)
         scrollbar = ttk.Scrollbar(card3, orient="vertical", command=canvas.yview)
@@ -405,9 +408,10 @@ class MultiProjectApp:
         card1 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
         card1.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(card1, text="1. Template Excel", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 10))
+        ttk.Label(card1, text="1. Template Excel", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        tk.Label(card1, text="Vorlage für die Ausgabe-Datei", bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY, font=('Segoe UI', 8)).pack(anchor=tk.W, pady=(0, 5))
         
-        self.template_label = tk.Label(card1, text="Keine Datei", bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_SECONDARY, anchor=tk.W)
+        self.template_label = tk.Label(card1, text="📄 Keine Datei ausgewählt", bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_SECONDARY, anchor=tk.W)
         self.template_label.pack(fill=tk.X, pady=(0, 10), ipady=5)
         
         ttk.Button(card1, text="📁 Template wählen", style='Primary.TButton', command=self.select_template).pack(fill=tk.X)
@@ -416,9 +420,10 @@ class MultiProjectApp:
         card2 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
         card2.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(card2, text="2. Quelldatei Excel", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 10))
+        ttk.Label(card2, text="2. Quelldatei Excel", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        tk.Label(card2, text="Datei mit zu transformierenden Daten", bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY, font=('Segoe UI', 8)).pack(anchor=tk.W, pady=(0, 5))
         
-        self.source_label = tk.Label(card2, text="Keine Datei", bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_SECONDARY, anchor=tk.W)
+        self.source_label = tk.Label(card2, text="📄 Keine Datei ausgewählt", bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_SECONDARY, anchor=tk.W)
         self.source_label.pack(fill=tk.X, pady=(0, 10), ipady=5)
         
         ttk.Button(card2, text="📁 Quelldatei wählen", style='Primary.TButton', command=self.select_source).pack(fill=tk.X)
@@ -584,9 +589,10 @@ class MultiProjectApp:
         card1 = tk.Frame(parent, bg=ModernStyle.BG_CARD, padx=15, pady=15)
         card1.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(card1, text="1. Scanned PDF (OCR)", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 10))
+        ttk.Label(card1, text="1. Scanned PDF (OCR)", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        tk.Label(card1, text="Gescannte Rechnungen automatisch erkennen", bg=ModernStyle.BG_CARD, fg=ModernStyle.TEXT_SECONDARY, font=('Segoe UI', 8)).pack(anchor=tk.W, pady=(0, 5))
 
-        self.ocr_file_label = tk.Label(card1, text="Keine Datei", bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_SECONDARY, anchor=tk.W)
+        self.ocr_file_label = tk.Label(card1, text="📄 Keine Datei ausgewählt", bg=ModernStyle.BG_INPUT, fg=ModernStyle.TEXT_SECONDARY, anchor=tk.W)
         self.ocr_file_label.pack(fill=tk.X, pady=(0, 10), ipady=5)
 
         btn_frame = tk.Frame(card1, bg=ModernStyle.BG_CARD)
@@ -699,9 +705,9 @@ class MultiProjectApp:
         filename = filedialog.askopenfilename(title="PDF auswählen", filetypes=[("PDF", "*.pdf")])
         if filename:
             self.pdf_path = filename
-            self.pdf_file_label.config(text=Path(filename).name, fg=ModernStyle.TEXT_PRIMARY)
+            self.pdf_file_label.config(text=f"✅ {Path(filename).name}", fg=ModernStyle.SUCCESS)
             self.pdf_extract_btn.config(state=tk.NORMAL)
-            self.pdf_status_label.config(text="Bereit", fg=ModernStyle.TEXT_SECONDARY)
+            self.pdf_status_label.config(text="✅ Bereit zum Extrahieren", fg=ModernStyle.SUCCESS)
 
     def extract_pdf_data(self):
         if not self.pdf_path: return
@@ -717,20 +723,25 @@ class MultiProjectApp:
             self.root.after(0, lambda: messagebox.showerror("Fehler", str(e)))
 
     def _pdf_extraction_complete(self):
-        self.pdf_status_label.config(text=f"✅ {len(self.raw_pdf_data)} Einträge", fg=ModernStyle.SUCCESS)
+        self.pdf_status_label.config(text=f"✅ Erfolgreich: {len(self.raw_pdf_data)} Rechnungseinträge extrahiert", fg=ModernStyle.SUCCESS)
         self.pdf_extract_btn.config(state=tk.NORMAL)
         self.pdf_export_btn.config(state=tk.NORMAL)
         self.apply_pdf_settings()
+        messagebox.showinfo(
+            "Extraktion abgeschlossen",
+            f"{len(self.raw_pdf_data)} Rechnungseinträge wurden erfolgreich extrahiert.\n\n" +
+            "Sie können jetzt die Daten in der Tabelle prüfen und bearbeiten."
+        )
 
     # OCR methods
     def select_ocr_pdf(self):
         """Always let user choose a scanned PDF; separate button loads pre-extracted Excel."""
-        filename = filedialog.askopenfilename(title="Scanned PDF auswählen", filetypes=[("PDF", "*.pdf")])
+        filename = filedialog.askopenfilename(title="Gescannte PDF auswählen", filetypes=[("PDF", "*.pdf")])
         if filename:
             self.ocr_path = filename
-            self.ocr_file_label.config(text=Path(filename).name, fg=ModernStyle.TEXT_PRIMARY)
+            self.ocr_file_label.config(text=f"✅ {Path(filename).name}", fg=ModernStyle.SUCCESS)
             self.ocr_extract_btn.config(state=tk.NORMAL)
-            self.ocr_status_label.config(text="Bereit (PDF gewählt)", fg=ModernStyle.TEXT_SECONDARY)
+            self.ocr_status_label.config(text="✅ Bereit für OCR-Extraktion", fg=ModernStyle.SUCCESS)
 
     def load_pre_extracted_ocr(self):
         """Load pre-extracted Excel instead of performing OCR."""
@@ -1111,7 +1122,7 @@ class MultiProjectApp:
                     )
                 self.mapping_data = df
                 self.pdf_mapping_status.config(
-                    text="✅ Datenbank aktiv",
+                    text=f"✅ Datenbank geladen ({len(df)} Einträge)",
                     fg=ModernStyle.SUCCESS
                 )
             except Exception as e:
@@ -1358,27 +1369,27 @@ class MultiProjectApp:
     # Excel Transformer Methods
     def select_template(self):
         filename = filedialog.askopenfilename(
-            title="Template wählen",
+            title="Template auswählen",
             filetypes=[("Excel", "*.xlsx")]
         )
         if filename:
             self.template_path = filename
             self.template_label.config(
-                text=Path(filename).name,
-                fg=ModernStyle.TEXT_PRIMARY
+                text=f"✅ {Path(filename).name}",
+                fg=ModernStyle.SUCCESS
             )
             self._check_excel_ready()
 
     def select_source(self):
         filename = filedialog.askopenfilename(
-            title="Quelldatei wählen",
+            title="Quelldatei auswählen",
             filetypes=[("Excel", "*.xlsx")]
         )
         if filename:
             self.source_path = filename
             self.source_label.config(
-                text=Path(filename).name,
-                fg=ModernStyle.TEXT_PRIMARY
+                text=f"✅ {Path(filename).name}",
+                fg=ModernStyle.SUCCESS
             )
             self._check_excel_ready()
 
@@ -1534,8 +1545,10 @@ class MultiProjectApp:
             
             self.excel_export_btn.config(state=tk.NORMAL)
             messagebox.showinfo(
-                "Erfolg",
-                f"{len(self.processed_data)} Einträge transformiert!"
+                "Transformation abgeschlossen",
+                f"✅ {len(self.processed_data)} Einträge erfolgreich transformiert!\n\n" +
+                "Die Daten wurden in die Tabelle geladen.\n" +
+                "Prüfen Sie die Einträge und klicken Sie auf 'Excel speichern'."
             )
             
         except Exception as e:
@@ -1579,8 +1592,9 @@ class MultiProjectApp:
             df = df[all_columns]
             df.to_excel(filename, index=False, engine='openpyxl')
             messagebox.showinfo(
-                "Erfolg",
-                f"Datei gespeichert:\n{Path(filename).name}"
+                "Export erfolgreich",
+                f"✅ Datei erfolgreich gespeichert:\n\n{Path(filename).name}\n\n" +
+                f"Speicherort: {Path(filename).parent}"
             )
             
         except Exception as e:
